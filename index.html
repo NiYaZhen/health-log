@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日健康記錄</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2c7a4b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="健康記錄">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #f5f5f5; color: #333; }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 24px; font-size: 20px; color: #2c7a4b; }
+  .section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section h2 { font-size: 14px; color: #2c7a4b; margin-bottom: 12px; border-bottom: 1px solid #e8f5ee; padding-bottom: 8px; }
+  label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+  input[type="date"], input[type="time"], input[type="text"], textarea {
+    width: 100%; border: 1px solid #ddd; border-radius: 8px;
+    padding: 9px 12px; font-size: 15px; font-family: inherit; color: #333;
+    -webkit-appearance: none; appearance: none;
+  }
+  input[type="date"], input[type="time"] { cursor: pointer; }
+  input:focus, textarea:focus { outline: none; border-color: #2c7a4b; }
+  textarea { resize: vertical; min-height: 60px; }
+  .hint { font-size: 11px; color: #888; margin-top: 3px; }
+  .duration-row { display: flex; align-items: center; gap: 6px; margin-top: 0; }
+  .duration-row select { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 9px 8px; font-size: 15px; font-family: inherit; color: #333; background: white; }
+  .duration-row select:focus { outline: none; border-color: #2c7a4b; }
+  .duration-unit { font-size: 14px; color: #555; white-space: nowrap; }
+
+  /* 飲食列 */
+  #meal-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .meal-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px; border: 1px solid #eee; border-radius: 10px;
+    background: #fafafa; transition: box-shadow 0.15s;
+  }
+  .meal-row.drag-over { border-color: #2c7a4b; background: #e8f5ee; }
+  .meal-row.dragging { opacity: 0.4; }
+
+  .drag-handle {
+    font-size: 18px; color: #bbb; cursor: grab; padding: 6px 2px;
+    user-select: none; flex-shrink: 0; line-height: 1;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; color: #888; }
+
+  .row-body { flex: 1; min-width: 0; }
+  .fixed-label { font-size: 13px; color: #555; margin-bottom: 4px; font-weight: 500; }
+  .label-input {
+    width: 100%; margin-bottom: 6px; border: 1px solid #ddd;
+    border-radius: 6px; padding: 5px 8px; font-size: 13px;
+    font-family: inherit; color: #333;
+  }
+  .label-input:focus { outline: none; border-color: #2c7a4b; }
+  .row-body textarea {
+    min-height: 52px; font-size: 14px; border-radius: 6px;
+  }
+
+  .del-btn {
+    background: none; border: none; color: #ccc; font-size: 20px;
+    cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; margin-top: 2px;
+  }
+  .del-btn:hover { color: #e55; }
+
+  .add-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 10px; background: none; border: 1px dashed #bbb;
+    border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #777;
+    cursor: pointer; width: 100%;
+  }
+  .add-btn:hover { border-color: #2c7a4b; color: #2c7a4b; }
+
+  /* 常用標籤 */
+  .tags-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .tag-edit-btn {
+    background: none; border: none; color: #aaa; font-size: 12px;
+    cursor: pointer; padding: 2px 4px;
+  }
+  .tag-edit-btn.active { color: #2c7a4b; }
+  .tags-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .tag-chip {
+    background: #e8f5ee; color: #2c7a4b; border: 1px solid #cfe9d9;
+    border-radius: 14px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 4px; line-height: 1.2;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tag-chip:active { background: #d2ecdf; }
+  .tag-chip .tag-x { display: none; color: #c66; font-weight: bold; margin-left: 2px; }
+  .tags-wrap.edit-mode .tag-chip .tag-x { display: inline; }
+  .tag-add {
+    background: none; border: 1px dashed #bbb; color: #888;
+  }
+  .tag-add:active { border-color: #2c7a4b; color: #2c7a4b; background: none; }
+
+  #generate-btn {
+    display: block; width: 100%; padding: 14px;
+    background: #2c7a4b; color: white; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: bold;
+    cursor: pointer; margin-bottom: 16px;
+  }
+  #generate-btn:active { background: #1e5c38; }
+  #output-section { display: none; }
+  #output-box {
+    background: white; border-radius: 12px; padding: 16px;
+    font-size: 14px; line-height: 1.8; white-space: pre-wrap;
+    border: 2px solid #2c7a4b; margin-bottom: 12px;
+    color: #333; font-family: inherit; word-break: break-all;
+  }
+  #copy-btn {
+    display: block; width: 100%; padding: 14px;
+    background: #4caf7d; color: white; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: bold;
+    cursor: pointer;
+  }
+  #copy-btn:active { background: #3a9068; }
+  #copy-msg { text-align: center; color: #2c7a4b; font-size: 13px; margin-top: 8px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>每日健康記錄</h1>
+
+<div class="section">
+  <h2>基本資料</h2>
+  <label>日期</label>
+  <input type="date" id="date" onclick="this.showPicker()">
+  <label>體重 (kg)</label>
+  <input type="text" id="weight" placeholder="例：55.2">
+  <p class="hint">※ 每日早上空腹測量</p>
+  <label>大號次數</label>
+  <input type="text" id="poop" placeholder="例：1">
+</div>
+
+<div class="section">
+  <h2>飲食</h2>
+  <div id="meal-list"></div>
+  <button class="add-btn" onclick="addMealRow()">＋ 新增項目（點心、飲料…）</button>
+  <label style="margin-top:16px">飲食小心得</label>
+  <textarea id="note" placeholder="今天吃得感覺如何、有沒有什麼特別的狀況..."></textarea>
+</div>
+
+<div class="section">
+  <h2>運動</h2>
+  <label>運動種類 + 時間</label>
+  <input type="text" id="exercise" placeholder="例：慢跑 30 分鐘">
+  <label>走路步數</label>
+  <input type="text" id="steps" placeholder="例：8500">
+</div>
+
+<div class="section">
+  <h2>水分 &amp; 睡眠</h2>
+  <label>攝取液體總量</label>
+  <input type="text" id="liquid" placeholder="例：1800">
+  <label>前一天入睡時間</label>
+  <input type="time" id="sleep-time" onclick="this.showPicker()">
+  <label>今天起床時間</label>
+  <input type="time" id="wake-time" onclick="this.showPicker()">
+  <label>睡眠總長度</label>
+  <div class="duration-row">
+    <select id="sleep-hr"><option value="">-</option></select>
+    <span class="duration-unit">小時</span>
+    <select id="sleep-min"><option value="">-</option></select>
+    <span class="duration-unit">分鐘</span>
+  </div>
+  <p class="hint">※ 填入睡覺與起床時間會自動計算，仍可手動調整</p>
+</div>
+
+<button id="generate-btn" onclick="generate()">產生記錄文字</button>
+
+<div id="output-section">
+  <div id="output-box"></div>
+  <button id="copy-btn" onclick="copyText()">複製到剪貼簿</button>
+  <p id="copy-msg">已複製！可以貼到 LINE 記事本了</p>
+</div>
+
+</div>
+
+<script>
+  // 日期預設今天
+  const today = new Date();
+  document.getElementById('date').value =
+    `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // 拖拉狀態
+  let dragSrc = null;
+  let pointerDownOnHandle = false;
+
+  // 常用食物標籤
+  const TAGS_KEY = 'mealTagsV1';
+  const DEFAULT_TAGS = {
+    '早餐': ['鮪魚御飯糰', '茶葉蛋', '豆漿'],
+    '午餐': [],
+    '晚餐': [],
+  };
+
+  function loadAllTags() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(TAGS_KEY));
+      if (saved && typeof saved === 'object') return saved;
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_TAGS));
+  }
+
+  function saveAllTags(tags) {
+    localStorage.setItem(TAGS_KEY, JSON.stringify(tags));
+  }
+
+  function getMealTags(label) {
+    const all = loadAllTags();
+    return all[label] || [];
+  }
+
+  function addMealTag(label, name) {
+    const all = loadAllTags();
+    if (!all[label]) all[label] = [];
+    if (!all[label].includes(name)) all[label].push(name);
+    saveAllTags(all);
+  }
+
+  function removeMealTag(label, name) {
+    const all = loadAllTags();
+    if (!all[label]) return;
+    all[label] = all[label].filter(t => t !== name);
+    saveAllTags(all);
+  }
+
+  function insertIntoTextarea(ta, text) {
+    const cur = ta.value.trim();
+    ta.value = cur ? `${cur}、${text}` : text;
+    ta.focus();
+  }
+
+  function renderTags(label, wrapEl, ta) {
+    wrapEl.innerHTML = '';
+
+    getMealTags(label).forEach(name => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'tag-chip';
+
+      const txt = document.createElement('span');
+      txt.textContent = name;
+      chip.appendChild(txt);
+
+      const x = document.createElement('span');
+      x.className = 'tag-x';
+      x.textContent = '×';
+      chip.appendChild(x);
+
+      chip.addEventListener('click', () => {
+        if (wrapEl.classList.contains('edit-mode')) {
+          removeMealTag(label, name);
+          renderTags(label, wrapEl, ta);
+        } else {
+          insertIntoTextarea(ta, name);
+        }
+      });
+
+      wrapEl.appendChild(chip);
+    });
+
+    const addChip = document.createElement('button');
+    addChip.type = 'button';
+    addChip.className = 'tag-chip tag-add';
+    addChip.textContent = '＋ 新增標籤';
+    addChip.addEventListener('click', () => {
+      const name = prompt(`新增「${label}」常用食物標籤：`);
+      if (name && name.trim()) {
+        addMealTag(label, name.trim());
+        renderTags(label, wrapEl, ta);
+      }
+    });
+    wrapEl.appendChild(addChip);
+  }
+
+  function makeMealRow({ label = '', placeholder = '', fixed = false } = {}) {
+    const row = document.createElement('div');
+    row.className = 'meal-row';
+    row.draggable = true;
+
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.textContent = '⠿';
+    handle.title = '拖移排序';
+
+    const body = document.createElement('div');
+    body.className = 'row-body';
+
+    const ta = document.createElement('textarea');
+    ta.placeholder = placeholder || '內容';
+
+    if (fixed) {
+      const head = document.createElement('div');
+      head.className = 'tags-head';
+      const lbl = document.createElement('div');
+      lbl.className = 'fixed-label';
+      lbl.textContent = label;
+      const editBtn = document.createElement('button');
+      editBtn.className = 'tag-edit-btn';
+      editBtn.type = 'button';
+      editBtn.textContent = '管理標籤';
+      head.appendChild(lbl);
+      head.appendChild(editBtn);
+      body.appendChild(head);
+
+      const tagsWrap = document.createElement('div');
+      tagsWrap.className = 'tags-wrap';
+      body.appendChild(tagsWrap);
+
+      editBtn.addEventListener('click', () => {
+        tagsWrap.classList.toggle('edit-mode');
+        editBtn.classList.toggle('active');
+      });
+
+      renderTags(label, tagsWrap, ta);
+    } else {
+      const inp = document.createElement('input');
+      inp.className = 'label-input';
+      inp.type = 'text';
+      inp.placeholder = '名稱（例：點心）';
+      inp.value = label;
+      body.appendChild(inp);
+    }
+
+    body.appendChild(ta);
+
+    row.appendChild(handle);
+    row.appendChild(body);
+
+    if (!fixed) {
+      const del = document.createElement('button');
+      del.className = 'del-btn';
+      del.textContent = '×';
+      del.title = '刪除';
+      del.addEventListener('click', () => row.remove());
+      row.appendChild(del);
+    }
+
+    // 只允許從 handle 開始拖
+    handle.addEventListener('pointerdown', () => { pointerDownOnHandle = true; });
+    document.addEventListener('pointerup', () => { pointerDownOnHandle = false; }, { capture: true });
+
+    row.addEventListener('dragstart', e => {
+      if (!pointerDownOnHandle) { e.preventDefault(); return; }
+      dragSrc = row;
+      e.dataTransfer.effectAllowed = 'move';
+      // 延遲加 class 避免拖影顯示空白
+      requestAnimationFrame(() => row.classList.add('dragging'));
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('.meal-row').forEach(r => r.classList.remove('drag-over'));
+      dragSrc = null;
+    });
+
+    row.addEventListener('dragover', e => {
+      if (!dragSrc || row === dragSrc) return;
+      e.preventDefault();
+      document.querySelectorAll('.meal-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || row === dragSrc) return;
+      const list = document.getElementById('meal-list');
+      const rows = [...list.children];
+      const si = rows.indexOf(dragSrc);
+      const di = rows.indexOf(row);
+      if (si < di) list.insertBefore(dragSrc, row.nextSibling);
+      else list.insertBefore(dragSrc, row);
+      row.classList.remove('drag-over');
+    });
+
+    return row;
+  }
+
+  function addMealRow() {
+    const list = document.getElementById('meal-list');
+    const row = makeMealRow();
+    list.appendChild(row);
+    row.querySelector('input')?.focus();
+  }
+
+  // 初始化固定三餐
+  (function init() {
+    const list = document.getElementById('meal-list');
+    [
+      { label: '早餐', placeholder: '例：燕麥粥、水煮蛋、豆漿', fixed: true },
+      { label: '午餐', placeholder: '例：雞腿便當（不吃炸物）', fixed: true },
+      { label: '晚餐', placeholder: '例：清蒸魚、燙青菜、糙米飯', fixed: true },
+    ].forEach(m => list.appendChild(makeMealRow(m)));
+  })();
+
+  function formatDate(val) {
+    if (!val) return '';
+    const [y, m, d] = val.split('-');
+    const weekDays = ['日','一','二','三','四','五','六'];
+    const day = weekDays[new Date(val).getDay()];
+    return `${y}/${m}/${d}（${day}）`;
+  }
+
+  function v(id) { return document.getElementById(id).value.trim(); }
+
+  // 睡眠時長選單
+  (function buildSleepSelects() {
+    const hr = document.getElementById('sleep-hr');
+    const min = document.getElementById('sleep-min');
+    for (let i = 1; i <= 12; i++) hr.innerHTML += `<option value="${i}">${i}</option>`;
+    for (let i = 0; i <= 59; i++) min.innerHTML += `<option value="${i}">${String(i).padStart(2,'0')}</option>`;
+  })();
+
+  function formatSleepTime(val) {
+    if (!val) return '';
+    const [hStr, mStr] = val.split(':');
+    let h = parseInt(hStr), m = parseInt(mStr);
+    const period = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2,'0')} ${period}`;
+  }
+
+  // 自動計算睡眠總長度
+  function autoCalcSleepDuration() {
+    const sleepVal = document.getElementById('sleep-time').value;
+    const wakeVal = document.getElementById('wake-time').value;
+    if (!sleepVal || !wakeVal) return;
+
+    const [sh, sm] = sleepVal.split(':').map(Number);
+    const [wh, wm] = wakeVal.split(':').map(Number);
+    let mins = (wh * 60 + wm) - (sh * 60 + sm);
+    if (mins <= 0) mins += 24 * 60; // 跨夜
+
+    const hr = Math.floor(mins / 60);
+    const min = mins % 60;
+
+    const hrSelect = document.getElementById('sleep-hr');
+    const minSelect = document.getElementById('sleep-min');
+    if ([...hrSelect.options].some(o => o.value === String(hr))) hrSelect.value = String(hr);
+    if ([...minSelect.options].some(o => o.value === String(min))) minSelect.value = String(min);
+  }
+
+  document.getElementById('sleep-time').addEventListener('change', autoCalcSleepDuration);
+  document.getElementById('wake-time').addEventListener('change', autoCalcSleepDuration);
+
+  function sleepDuration() {
+    const hr = document.getElementById('sleep-hr').value;
+    const min = document.getElementById('sleep-min').value;
+    if (!hr && !min) return '';
+    let s = '';
+    if (hr) s += `${hr}小時`;
+    if (min && min !== '0') s += `${min}分鐘`;
+    return s;
+  }
+
+  function fmt(val) {
+    const n = Number(val.replace(/,/g, ''));
+    return isNaN(n) || val === '' ? val : n.toLocaleString('zh-TW');
+  }
+
+  function generate() {
+    const mealLines = [];
+    document.querySelectorAll('#meal-list .meal-row').forEach(row => {
+      const labelEl = row.querySelector('.fixed-label');
+      const labelInp = row.querySelector('.label-input');
+      const lbl = labelEl ? labelEl.textContent : (labelInp ? labelInp.value.trim() : '');
+      const val = row.querySelector('textarea').value.trim();
+      mealLines.push(`${lbl}：${val}`);
+    });
+
+    const text =
+`日期：${formatDate(v('date'))}
+體重：${v('weight')}
+※ 體重是每日早上空腹
+大號次數：${v('poop')}
+
+${mealLines.join('\n')}
+
+飲食小心得 ( 目的是讓我更了解你！)：
+${v('note')}
+
+運動種類 + 時間：${v('exercise')}
+走路步數（手機或手錶）：${fmt(v('steps'))}
+
+攝取液體總量（咖啡、飲料或茶都算）：${fmt(v('liquid'))}ml
+
+前一天入睡時間：${formatSleepTime(v('sleep-time'))}
+睡眠總長度 ：${sleepDuration()}`;
+
+    document.getElementById('output-box').textContent = text;
+    document.getElementById('output-section').style.display = 'block';
+    document.getElementById('copy-msg').style.display = 'none';
+    document.getElementById('output-section').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function copyText() {
+    navigator.clipboard.writeText(document.getElementById('output-box').textContent).then(() => {
+      document.getElementById('copy-msg').style.display = 'block';
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  }
+</script>
+</body>
+</html>

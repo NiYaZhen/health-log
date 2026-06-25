@@ -1,0 +1,13 @@
+{
+  "name": "每日健康記錄",
+  "short_name": "健康記錄",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#2c7a4b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
