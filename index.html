@@ -25,7 +25,7 @@
     padding: 9px 12px; font-size: 15px; font-family: inherit; color: #333;
     -webkit-appearance: none; appearance: none;
   }
-  input[type="date"], input[type="time"] { cursor: pointer; }
+  input[type="date"], input[type="time"] { cursor: pointer; min-height: 38px; }
   input:focus, textarea:focus { outline: none; border-color: #2c7a4b; }
   textarea { resize: vertical; min-height: 60px; }
   .hint { font-size: 11px; color: #888; margin-top: 3px; }
@@ -42,15 +42,21 @@
     padding: 10px; border: 1px solid #eee; border-radius: 10px;
     background: #fafafa; transition: box-shadow 0.15s;
   }
-  .move-btns { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .move-btns {
+    display: flex; flex-direction: column; flex-shrink: 0;
+    border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+    background: white;
+  }
   .move-btns button {
-    background: none; border: 1px solid #ddd; border-radius: 6px;
-    color: #888; font-size: 13px; padding: 3px 8px; line-height: 1;
+    background: none; border: none; color: #999;
+    font-size: 11px; width: 30px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
     cursor: pointer;
   }
-  .move-btns button:active { background: #e8f5ee; border-color: #2c7a4b; color: #2c7a4b; }
+  .move-btns button:first-child { border-bottom: 1px solid #e0e0e0; }
+  .move-btns button:active { background: #e8f5ee; color: #2c7a4b; }
   .move-btns button:disabled { opacity: 0.3; cursor: default; }
-  .move-btns button:disabled:active { background: none; border-color: #ddd; color: #888; }
+  .move-btns button:disabled:active { background: none; color: #999; }
 
   .row-body { flex: 1; min-width: 0; }
   .fixed-label { font-size: 13px; color: #555; margin-bottom: 4px; font-weight: 500; }
