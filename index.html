@@ -42,14 +42,15 @@
     padding: 10px; border: 1px solid #eee; border-radius: 10px;
     background: #fafafa; transition: box-shadow 0.15s;
   }
-  .meal-row.dragging { box-shadow: 0 6px 16px rgba(0,0,0,0.18); background: #fff; }
-
-  .drag-handle {
-    font-size: 18px; color: #bbb; cursor: grab; padding: 6px 2px;
-    user-select: none; flex-shrink: 0; line-height: 1;
-    touch-action: none;
+  .move-btns { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .move-btns button {
+    background: none; border: 1px solid #ddd; border-radius: 6px;
+    color: #888; font-size: 13px; padding: 3px 8px; line-height: 1;
+    cursor: pointer;
   }
-  .drag-handle:active { cursor: grabbing; color: #888; }
+  .move-btns button:active { background: #e8f5ee; border-color: #2c7a4b; color: #2c7a4b; }
+  .move-btns button:disabled { opacity: 0.3; cursor: default; }
+  .move-btns button:disabled:active { background: none; border-color: #ddd; color: #888; }
 
   .row-body { flex: 1; min-width: 0; }
   .fixed-label { font-size: 13px; color: #555; margin-bottom: 4px; font-weight: 500; }
@@ -281,10 +282,18 @@
     const row = document.createElement('div');
     row.className = 'meal-row';
 
-    const handle = document.createElement('span');
-    handle.className = 'drag-handle';
-    handle.textContent = '⠿';
-    handle.title = '拖移排序';
+    const moveBtns = document.createElement('div');
+    moveBtns.className = 'move-btns';
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.textContent = '▲';
+    upBtn.title = '上移';
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.textContent = '▼';
+    downBtn.title = '下移';
+    moveBtns.appendChild(upBtn);
+    moveBtns.appendChild(downBtn);
 
     const body = document.createElement('div');
     body.className = 'row-body';
@@ -327,7 +336,7 @@
 
     body.appendChild(ta);
 
-    row.appendChild(handle);
+    row.appendChild(moveBtns);
     row.appendChild(body);
 
     if (!fixed) {
@@ -335,83 +344,32 @@
       del.className = 'del-btn';
       del.textContent = '×';
       del.title = '刪除';
-      del.addEventListener('click', () => row.remove());
+      del.addEventListener('click', () => { row.remove(); refreshMoveBtns(); });
       row.appendChild(del);
     }
 
-    handle.addEventListener('pointerdown', e => startDrag(e, row));
+    upBtn.addEventListener('click', () => moveRow(row, -1));
+    downBtn.addEventListener('click', () => moveRow(row, 1));
 
     return row;
   }
 
-  // 拖拉排序（用 Pointer Events 取代原生 HTML5 drag-and-drop，
-  // 因為大多數手機瀏覽器的 touch 不支援原生 drag-and-drop）
-  let dragState = null;
-
-  function startDrag(e, row) {
-    e.preventDefault();
-    const list = document.getElementById('meal-list');
-    dragState = {
-      row,
-      list,
-      startClientY: e.clientY,
-      adjust: 0,
-    };
-    row.classList.add('dragging');
-    row.style.position = 'relative';
-    row.style.zIndex = '10';
-    document.addEventListener('pointermove', onDragMove);
-    document.addEventListener('pointerup', endDrag);
-    document.addEventListener('pointercancel', endDrag);
+  function moveRow(row, dir) {
+    const sibling = dir === -1 ? row.previousElementSibling : row.nextElementSibling;
+    if (!sibling) return;
+    const list = row.parentElement;
+    if (dir === -1) list.insertBefore(row, sibling);
+    else list.insertBefore(sibling, row);
+    refreshMoveBtns();
   }
 
-  function applyTransform(e) {
-    const dy = (e.clientY - dragState.startClientY) + dragState.adjust;
-    dragState.row.style.transform = `translateY(${dy}px)`;
-  }
-
-  function onDragMove(e) {
-    if (!dragState) return;
-    applyTransform(e);
-
-    const { row, list } = dragState;
-    const rows = [...list.children];
-    const idx = rows.indexOf(row);
-
-    if (idx > 0) {
-      const prev = rows[idx - 1];
-      const prevRect = prev.getBoundingClientRect();
-      if (e.clientY < prevRect.top + prevRect.height / 2) {
-        const beforeTop = row.offsetTop;
-        list.insertBefore(row, prev);
-        dragState.adjust += beforeTop - row.offsetTop;
-        applyTransform(e);
-        return;
-      }
-    }
-
-    if (idx < rows.length - 1) {
-      const next = rows[idx + 1];
-      const nextRect = next.getBoundingClientRect();
-      if (e.clientY > nextRect.top + nextRect.height / 2) {
-        const beforeTop = row.offsetTop;
-        list.insertBefore(row, next.nextSibling);
-        dragState.adjust += beforeTop - row.offsetTop;
-        applyTransform(e);
-      }
-    }
-  }
-
-  function endDrag() {
-    if (!dragState) return;
-    dragState.row.classList.remove('dragging');
-    dragState.row.style.position = '';
-    dragState.row.style.zIndex = '';
-    dragState.row.style.transform = '';
-    document.removeEventListener('pointermove', onDragMove);
-    document.removeEventListener('pointerup', endDrag);
-    document.removeEventListener('pointercancel', endDrag);
-    dragState = null;
+  function refreshMoveBtns() {
+    const rows = [...document.querySelectorAll('#meal-list .meal-row')];
+    rows.forEach((row, i) => {
+      const [up, down] = row.querySelectorAll('.move-btns button');
+      up.disabled = i === 0;
+      down.disabled = i === rows.length - 1;
+    });
   }
 
   function addMealRow() {
@@ -419,6 +377,7 @@
     const row = makeMealRow();
     list.appendChild(row);
     row.querySelector('input')?.focus();
+    refreshMoveBtns();
   }
 
   // 初始化固定三餐
@@ -429,6 +388,7 @@
       { label: '午餐', placeholder: '例：雞腿便當（不吃炸物）', fixed: true },
       { label: '晚餐', placeholder: '例：清蒸魚、燙青菜、糙米飯', fixed: true },
     ].forEach(m => list.appendChild(makeMealRow(m)));
+    refreshMoveBtns();
   })();
 
   function formatDate(val) {
