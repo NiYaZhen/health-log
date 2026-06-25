@@ -42,8 +42,7 @@
     padding: 10px; border: 1px solid #eee; border-radius: 10px;
     background: #fafafa; transition: box-shadow 0.15s;
   }
-  .meal-row.drag-over { border-color: #2c7a4b; background: #e8f5ee; }
-  .meal-row.dragging { opacity: 0.4; }
+  .meal-row.dragging { box-shadow: 0 6px 16px rgba(0,0,0,0.18); background: #fff; }
 
   .drag-handle {
     font-size: 18px; color: #bbb; cursor: grab; padding: 6px 2px;
@@ -190,10 +189,6 @@
   document.getElementById('date').value =
     `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
-  // 拖拉狀態
-  let dragSrc = null;
-  let pointerDownOnHandle = false;
-
   // 常用食物標籤
   const TAGS_KEY = 'mealTagsV1';
   const DEFAULT_TAGS = {
@@ -285,7 +280,6 @@
   function makeMealRow({ label = '', placeholder = '', fixed = false } = {}) {
     const row = document.createElement('div');
     row.className = 'meal-row';
-    row.draggable = true;
 
     const handle = document.createElement('span');
     handle.className = 'drag-handle';
@@ -345,46 +339,79 @@
       row.appendChild(del);
     }
 
-    // 只允許從 handle 開始拖
-    handle.addEventListener('pointerdown', () => { pointerDownOnHandle = true; });
-    document.addEventListener('pointerup', () => { pointerDownOnHandle = false; }, { capture: true });
-
-    row.addEventListener('dragstart', e => {
-      if (!pointerDownOnHandle) { e.preventDefault(); return; }
-      dragSrc = row;
-      e.dataTransfer.effectAllowed = 'move';
-      // 延遲加 class 避免拖影顯示空白
-      requestAnimationFrame(() => row.classList.add('dragging'));
-    });
-
-    row.addEventListener('dragend', () => {
-      row.classList.remove('dragging');
-      document.querySelectorAll('.meal-row').forEach(r => r.classList.remove('drag-over'));
-      dragSrc = null;
-    });
-
-    row.addEventListener('dragover', e => {
-      if (!dragSrc || row === dragSrc) return;
-      e.preventDefault();
-      document.querySelectorAll('.meal-row').forEach(r => r.classList.remove('drag-over'));
-      row.classList.add('drag-over');
-    });
-
-    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
-
-    row.addEventListener('drop', e => {
-      e.preventDefault();
-      if (!dragSrc || row === dragSrc) return;
-      const list = document.getElementById('meal-list');
-      const rows = [...list.children];
-      const si = rows.indexOf(dragSrc);
-      const di = rows.indexOf(row);
-      if (si < di) list.insertBefore(dragSrc, row.nextSibling);
-      else list.insertBefore(dragSrc, row);
-      row.classList.remove('drag-over');
-    });
+    handle.addEventListener('pointerdown', e => startDrag(e, row));
 
     return row;
+  }
+
+  // 拖拉排序（用 Pointer Events 取代原生 HTML5 drag-and-drop，
+  // 因為大多數手機瀏覽器的 touch 不支援原生 drag-and-drop）
+  let dragState = null;
+
+  function startDrag(e, row) {
+    e.preventDefault();
+    const list = document.getElementById('meal-list');
+    dragState = {
+      row,
+      list,
+      startClientY: e.clientY,
+      adjust: 0,
+    };
+    row.classList.add('dragging');
+    row.style.position = 'relative';
+    row.style.zIndex = '10';
+    document.addEventListener('pointermove', onDragMove);
+    document.addEventListener('pointerup', endDrag);
+    document.addEventListener('pointercancel', endDrag);
+  }
+
+  function applyTransform(e) {
+    const dy = (e.clientY - dragState.startClientY) + dragState.adjust;
+    dragState.row.style.transform = `translateY(${dy}px)`;
+  }
+
+  function onDragMove(e) {
+    if (!dragState) return;
+    applyTransform(e);
+
+    const { row, list } = dragState;
+    const rows = [...list.children];
+    const idx = rows.indexOf(row);
+
+    if (idx > 0) {
+      const prev = rows[idx - 1];
+      const prevRect = prev.getBoundingClientRect();
+      if (e.clientY < prevRect.top + prevRect.height / 2) {
+        const beforeTop = row.offsetTop;
+        list.insertBefore(row, prev);
+        dragState.adjust += beforeTop - row.offsetTop;
+        applyTransform(e);
+        return;
+      }
+    }
+
+    if (idx < rows.length - 1) {
+      const next = rows[idx + 1];
+      const nextRect = next.getBoundingClientRect();
+      if (e.clientY > nextRect.top + nextRect.height / 2) {
+        const beforeTop = row.offsetTop;
+        list.insertBefore(row, next.nextSibling);
+        dragState.adjust += beforeTop - row.offsetTop;
+        applyTransform(e);
+      }
+    }
+  }
+
+  function endDrag() {
+    if (!dragState) return;
+    dragState.row.classList.remove('dragging');
+    dragState.row.style.position = '';
+    dragState.row.style.zIndex = '';
+    dragState.row.style.transform = '';
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', endDrag);
+    document.removeEventListener('pointercancel', endDrag);
+    dragState = null;
   }
 
   function addMealRow() {
